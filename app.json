@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.duffy02.VideoIMUApp"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,6 +28,13 @@
       "eas": {
         "projectId": "c213c68a-be36-4b28-9142-ce4a66640e62"
       }
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c213c68a-be36-4b28-9142-ce4a66640e62"
+    },
+    "owner": "duffy02"
   }
 }

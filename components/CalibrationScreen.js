@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';  // Import Ionicons for the camer
 
 export default function CalibrationScreen({ navigation }) {
   const [facing, setFacing] = useState("back");
+  const [torch, setTorch] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   const [calibrationData, setCalibrationData] = useState(null);
@@ -85,6 +86,10 @@ export default function CalibrationScreen({ navigation }) {
     setFacing((current) => (current === "back" ? "front" : "back"));
   };
 
+  const toggleTorch = () => {;
+    setTorch(!torch);
+  };
+
   return (
     <View style={styles.container}>
       {calibrationData ? (
@@ -93,13 +98,16 @@ export default function CalibrationScreen({ navigation }) {
           <Text>{JSON.stringify(calibrationData, null, 2)}</Text>
         </View>
       ) : (
-        <CameraView ref={cameraRef} style={styles.camera} facing={facing} mode="picture">
+        <CameraView ref={cameraRef} style={styles.camera} facing={facing} mode="picture" enableTorch={torch}>
           <View style={styles.headerIconsContainer}>
-            <SafeAreaView>
-              <TouchableOpacity onPress={toggleCameraFacing}>
-                <Ionicons name="camera-reverse-outline" size={30} color="white" />
-              </TouchableOpacity>
-            </SafeAreaView>
+          <SafeAreaView style={{ flexDirection: "row", justifyContent: "space-between", width: '100%' }}>
+            <TouchableOpacity onPress={toggleTorch} style={{ marginLeft: 10 }}>
+              <Ionicons name={torch === false ? "flash-off" : "flash"} size={30} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleCameraFacing} style={{ marginRight: 10 }}>
+              <Ionicons name="camera-reverse-outline" size={30} color="white" />
+            </TouchableOpacity>
+          </SafeAreaView>
           </View>
           {calibrating ? (
             <View style={styles.buttonContainer}>

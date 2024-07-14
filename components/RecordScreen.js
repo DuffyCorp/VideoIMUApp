@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Button } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system";
@@ -10,6 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 export default function RecordScreen({ navigation }) {
   const [facing, setFacing] = useState("back");
+  const [torch, setTorch] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [audioPermission, requestAudioPermission] = useMicrophonePermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
@@ -75,8 +76,8 @@ export default function RecordScreen({ navigation }) {
       imuDataRef.current = [];  // Clear previous IMU data
       const startTime = new Date().getTime();
 
-      Gyroscope.setUpdateInterval(100);
-      Accelerometer.setUpdateInterval(100);
+      Gyroscope.setUpdateInterval(50);
+      Accelerometer.setUpdateInterval(50);
 
       const imuListener = async ({ gyro, accel }) => {
         const currentTime = new Date();
@@ -142,6 +143,10 @@ export default function RecordScreen({ navigation }) {
     }
   };
 
+  const toggleTorch = () => {;
+    setTorch(!torch);
+  };
+
   if (!permission || !mediaPermission || !audioPermission || !locationPermission) {
     return <View />;
   }
@@ -188,13 +193,16 @@ export default function RecordScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing={facing} mode="video">
+      <CameraView ref={cameraRef} style={styles.camera} facing={facing} mode="video" enableTorch={torch}>
       <View style={styles.headerIconsContainer}>
-        <SafeAreaView>
-          <TouchableOpacity onPress={toggleCameraFacing}>
-            <Ionicons name="camera-reverse-outline" size={30} color="white" />
-          </TouchableOpacity>
-        </SafeAreaView>
+      <SafeAreaView style={{ flexDirection: "row", justifyContent: "space-between", width: '100%' }}>
+            <TouchableOpacity onPress={toggleTorch} style={{ marginLeft: 10 }}>
+              <Ionicons name={torch === false ? "flash-off" : "flash"} size={30} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleCameraFacing} style={{ marginRight: 10 }}>
+              <Ionicons name="camera-reverse-outline" size={30} color="white" />
+            </TouchableOpacity>
+          </SafeAreaView>
           
         </View>
         <View style={styles.timerContainer}>
