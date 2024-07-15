@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Dimensions, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Dimensions, Alert, StyleSheet, Button } from 'react-native';
 import { Video } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
@@ -17,6 +17,7 @@ export default function VideoDetailScreen({ route, navigation }) {
   const [chartDataX, setChartDataX] = useState({ labels: [], datasets: [{ data: [] }] });
   const [chartDataY, setChartDataY] = useState({ labels: [], datasets: [{ data: [] }] });
   const [chartDataZ, setChartDataZ] = useState({ labels: [], datasets: [{ data: [] }] });
+  const [selectedChart, setSelectedChart] = useState('x'); // 'x', 'y', or 'z'
 
   useEffect(() => {
     (async () => {
@@ -34,7 +35,8 @@ export default function VideoDetailScreen({ route, navigation }) {
 
   const updateChartData = currentTime => {
     try {
-      const currentImuData = imuData.filter(data => data.timestamp <= currentTime * 1000);
+      const tenSecondsAgo = currentTime - 10;
+      const currentImuData = imuData.filter(data => data.timestamp >= tenSecondsAgo * 1000 && data.timestamp <= currentTime * 1000);
       if (currentImuData.length > 0) {
         const latestData = currentImuData[currentImuData.length - 1];
         setGpsCoordinates({ latitude: latestData.latitude, longitude: latestData.longitude });
@@ -58,6 +60,20 @@ export default function VideoDetailScreen({ route, navigation }) {
     }
   };
 
+  const renderChart = (data, color) => (
+    <LineChart
+      data={data}
+      width={screenWidth - 20}
+      height={220}
+      chartConfig={{
+        ...chartConfig,
+        color: (opacity = 1) => `rgba(${color}, ${opacity})`,
+      }}
+      bezier
+      style={styles.chart}
+    />
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {selectedVideoUri && (
@@ -78,47 +94,28 @@ export default function VideoDetailScreen({ route, navigation }) {
               }
             }}
           />
-          <Text style={styles.chartTitle}>X Axis IMU Data</Text>
-          {chartDataX.labels.length >= 1 && (
-            <LineChart
-              data={chartDataX}
-              width={screenWidth - 20}
-              height={220}
-              chartConfig={{
-                ...chartConfig,
-                color: (opacity = 1) => `rgba(255, 0, 0, ${opacity})`, // Red color
-              }}
-              bezier
-              style={styles.chart}
-            />
+          <View style={styles.buttonContainer}>
+            <Button title="X Axis" onPress={() => setSelectedChart('x')} />
+            <Button title="Y Axis" onPress={() => setSelectedChart('y')} />
+            <Button title="Z Axis" onPress={() => setSelectedChart('z')} />
+          </View>
+          {selectedChart === 'x' && (
+            <>
+              <Text style={styles.chartTitle}>X Axis IMU Data</Text>
+              {chartDataX.labels.length >= 1 && renderChart(chartDataX, '255, 0, 0')}
+            </>
           )}
-          <Text style={styles.chartTitle}>Y Axis IMU Data</Text>
-          {chartDataY.labels.length >= 1 && (
-            <LineChart
-              data={chartDataY}
-              width={screenWidth - 20}
-              height={220}
-              chartConfig={{
-                ...chartConfig,
-                color: (opacity = 1) => `rgba(0, 255, 0, ${opacity})`, // Green color
-              }}
-              bezier
-              style={styles.chart}
-            />
+          {selectedChart === 'y' && (
+            <>
+              <Text style={styles.chartTitle}>Y Axis IMU Data</Text>
+              {chartDataY.labels.length >= 1 && renderChart(chartDataY, '0, 255, 0')}
+            </>
           )}
-          <Text style={styles.chartTitle}>Z Axis IMU Data</Text>
-          {chartDataZ.labels.length >= 1 && (
-            <LineChart
-              data={chartDataZ}
-              width={screenWidth - 20}
-              height={220}
-              chartConfig={{
-                ...chartConfig,
-                color: (opacity = 1) => `rgba(0, 0, 255, ${opacity})`, // Blue color
-              }}
-              bezier
-              style={styles.chart}
-            />
+          {selectedChart === 'z' && (
+            <>
+              <Text style={styles.chartTitle}>Z Axis IMU Data</Text>
+              {chartDataZ.labels.length >= 1 && renderChart(chartDataZ, '0, 0, 255')}
+            </>
           )}
           <Text style={styles.chartTitle}>Coordinates</Text>
           <View style={styles.gpsContainer}>
@@ -179,6 +176,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chart: {
+    marginVertical: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginVertical: 10,
   },
   gpsContainer: {

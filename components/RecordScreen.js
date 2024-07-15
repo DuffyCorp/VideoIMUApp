@@ -10,6 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 export default function RecordScreen({ navigation }) {
   const [facing, setFacing] = useState("back");
+  const [proccessing, setProccessing] = useState(false);
   const [torch, setTorch] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [audioPermission, requestAudioPermission] = useMicrophonePermissions();
@@ -19,6 +20,7 @@ export default function RecordScreen({ navigation }) {
   const [imuData, setImuData] = useState([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const cameraRef = useRef(null);
+  const videoAssetRef = useRef(null);
   const gyroSubscription = useRef(null);
   const accelSubscription = useRef(null);
   const imuDataRef = useRef([]);
@@ -31,36 +33,19 @@ export default function RecordScreen({ navigation }) {
     })();
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const toggleCameraFacing = () => {
-        setFacing((current) => (current === "back" ? "front" : "back"));
-      };
+  useEffect(() => {
+    const toggleCameraFacing = () => {
+      setFacing((current) => (current === "back" ? "front" : "back"));
+    };
 
-      navigation.setOptions({
-        headerRight: () => (
-          <TouchableOpacity onPress={toggleCameraFacing} style={{ marginRight: 10 }}>
-            <Ionicons name="camera-reverse-outline" size={30} color="black" />
-          </TouchableOpacity>
-        ),
-      });
-
-      return () => {
-        // Cleanup any ongoing processes
-        if (gyroSubscription.current) {
-          Gyroscope.removeAllListeners();
-          gyroSubscription.current = null;
-        }
-        if (accelSubscription.current) {
-          Accelerometer.removeAllListeners();
-          accelSubscription.current = null;
-        }
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-      };
-    }, [navigation])
-  );
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={toggleCameraFacing} style={{ marginRight: 10 }}>
+          <Ionicons name="camera-reverse-outline" size={30} color="black" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const formatTime = (date) => {
     const hours = String(date.getHours()).padStart(2, '0');
@@ -76,55 +61,87 @@ export default function RecordScreen({ navigation }) {
       imuDataRef.current = [];  // Clear previous IMU data
       const startTime = new Date().getTime();
 
-      Gyroscope.setUpdateInterval(50);
-      Accelerometer.setUpdateInterval(50);
+      Gyroscope.setUpdateInterval(100);
+      Accelerometer.setUpdateInterval(100);
 
-      const imuListener = async ({ gyro, accel }) => {
+      const imuListener = async (data, sensorType) => {
         const currentTime = new Date();
         const timestamp = new Date().getTime() - startTime;
         const formattedTime = formatTime(currentTime);
         const location = await Location.getCurrentPositionAsync({});
         const { latitude, longitude } = location.coords;
-        imuDataRef.current.push({ ...gyro, ...accel, latitude, longitude, timestamp, time: formattedTime });
+
+        const imuDataEntry = {
+          ...data,
+          latitude,
+          longitude,
+          timestamp,
+          time: formattedTime,
+          sensorType
+        };
+
+        //console.log(imuDataEntry);
+        imuDataRef.current.push(imuDataEntry);
       };
 
-      gyroSubscription.current = Gyroscope.addListener(gyro => imuListener({ gyro }));
-      accelSubscription.current = Accelerometer.addListener(accel => imuListener({ accel }));
+      gyroSubscription.current = Gyroscope.addListener((data) => imuListener(data, 'gyro'));
+      accelSubscription.current = Accelerometer.addListener((data) => imuListener(data, 'accel'));
 
-      const video = await cameraRef.current.recordAsync();
-      const videoUri = video.uri;
-      const videoAsset = await MediaLibrary.createAssetAsync(videoUri);
-      const imuFileUri = FileSystem.documentDirectory + `${videoAsset.filename}-imuData.json`;
-      await FileSystem.writeAsStringAsync(imuFileUri, JSON.stringify(imuDataRef.current));
+      startRecordingTimer();
 
-      // console.log("IMU Data:", imuDataRef.current);  // Debugging line
-
-      // Save metadata
-      const metadata = {
-        videoAssetId: videoAsset.id,
-        imuUri: imuFileUri,
-        creationTime: videoAsset.creationTime
-      };
-      const metadataFileUri = FileSystem.documentDirectory + 'metadata.json';
-      let existingMetadata = [];
       try {
-        const metadataJson = await FileSystem.readAsStringAsync(metadataFileUri);
-        existingMetadata = JSON.parse(metadataJson);
-      } catch (e) {
-        console.log('No existing metadata found, creating new.');
+        const video = await cameraRef.current.recordAsync();
+        const videoUri = video.uri;
+        const videoAsset = await MediaLibrary.createAssetAsync(videoUri);
+        const imuFileUri = FileSystem.documentDirectory + `${videoAsset.filename}-imuData.json`;
+        await FileSystem.writeAsStringAsync(imuFileUri, "");
+
+        // Save metadata
+        const metadata = {
+          videoAssetId: videoAsset.id,
+          imuUri: imuFileUri,
+          creationTime: videoAsset.creationTime
+        };
+
+        videoAssetRef.current = videoAsset.filename
+
+
+        const metadataFileUri = FileSystem.documentDirectory + 'metadata.json';
+        let existingMetadata = [];
+        try {
+          const metadataJson = await FileSystem.readAsStringAsync(metadataFileUri);
+          existingMetadata = JSON.parse(metadataJson);
+        } catch (e) {
+          console.log('No existing metadata found, creating new.');
+        }
+        existingMetadata.push(metadata);
+        await FileSystem.writeAsStringAsync(metadataFileUri, JSON.stringify(existingMetadata));
+      } finally {
+        
+        Gyroscope.removeAllListeners();
+        Accelerometer.removeAllListeners();
+        
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
+        const imuFileUri = FileSystem.documentDirectory + `${videoAssetRef.current}-imuData.json`;
+
+        setRecording(false);
+
+        setProccessing(true)
+        await FileSystem.writeAsStringAsync(imuFileUri, JSON.stringify(imuDataRef.current));
+        
+        gyroSubscription.current = null;
+        accelSubscription.current = null;
+        
+
+        //console.log("IMU Data:", imuDataRef.current);  // Debugging line
+
+        setImuData(imuDataRef.current);  // Update the state with the current IMU data
+        clearInterval(timerRef.current);
+        videoAssetRef.current = null
+        setProccessing(false)
+        Alert.alert("Recording Stopped", "The video and IMU data have been saved.");
       }
-      existingMetadata.push(metadata);
-      await FileSystem.writeAsStringAsync(metadataFileUri, JSON.stringify(existingMetadata));
-
-      Gyroscope.removeAllListeners();
-      Accelerometer.removeAllListeners();
-      gyroSubscription.current = null;
-      accelSubscription.current = null;
-      setRecording(false);
-      setImuData(imuDataRef.current);  // Update the state with the current IMU data
-
-      Alert.alert("Recording Stopped", "The video and IMU data have been saved.");
-      clearInterval(timerRef.current);
     } else {
       console.log("No Camera Ref or necessary permissions not granted");
     }
@@ -141,10 +158,6 @@ export default function RecordScreen({ navigation }) {
       setImuData(imuDataRef.current);  // Update the state with the current IMU data
       clearInterval(timerRef.current);
     }
-  };
-
-  const toggleTorch = () => {;
-    setTorch(!torch);
   };
 
   if (!permission || !mediaPermission || !audioPermission || !locationPermission) {
@@ -185,6 +198,10 @@ export default function RecordScreen({ navigation }) {
     }
   };
 
+  const toggleTorch = () => {
+    setTorch(!torch);
+  };
+
   const formatDuration = (duration) => {
     const minutes = String(Math.floor(duration / 60)).padStart(2, '0');
     const seconds = String(duration % 60).padStart(2, '0');
@@ -194,8 +211,8 @@ export default function RecordScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={styles.camera} facing={facing} mode="video" enableTorch={torch}>
-      <View style={styles.headerIconsContainer}>
-      <SafeAreaView style={{ flexDirection: "row", justifyContent: "space-between", width: '100%' }}>
+        <View style={styles.headerIconsContainer}>
+          <SafeAreaView style={{ flexDirection: "row", justifyContent: "space-between", width: '100%' }}>
             <TouchableOpacity onPress={toggleTorch} style={{ marginLeft: 10 }}>
               <Ionicons name={torch === false ? "flash-off" : "flash"} size={30} color="white" />
             </TouchableOpacity>
@@ -203,7 +220,6 @@ export default function RecordScreen({ navigation }) {
               <Ionicons name="camera-reverse-outline" size={30} color="white" />
             </TouchableOpacity>
           </SafeAreaView>
-          
         </View>
         <View style={styles.timerContainer}>
           {recording && (
@@ -214,9 +230,9 @@ export default function RecordScreen({ navigation }) {
           )}
         </View>
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.recordButton} onPress={handleRecordingPress}>
+          {proccessing ? <Text>Proccessing data...</Text>:<TouchableOpacity style={styles.recordButton} onPress={handleRecordingPress}>
             <Ionicons name={recording ? "stop-circle-outline" : "radio-button-on"} size={80} color="red" />
-          </TouchableOpacity>
+          </TouchableOpacity>}
           {recording && (
             <View style={styles.imuIndicatorContainer}>
               <Ionicons name="checkmark-circle-outline" size={30} color="green" />
@@ -274,4 +290,3 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 });
-
