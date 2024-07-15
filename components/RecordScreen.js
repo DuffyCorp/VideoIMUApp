@@ -87,8 +87,6 @@ export default function RecordScreen({ navigation }) {
       gyroSubscription.current = Gyroscope.addListener((data) => imuListener(data, 'gyro'));
       accelSubscription.current = Accelerometer.addListener((data) => imuListener(data, 'accel'));
 
-      startRecordingTimer();
-
       try {
         const video = await cameraRef.current.recordAsync();
         const videoUri = video.uri;
