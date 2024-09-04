@@ -46,8 +46,8 @@ export default function CalibrationScreen({ navigation }) {
       for (let i = 0; i < 30; i++) {
         const photo = await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 1, // Highest quality
-          exif: false, // Exclude EXIF data
+          quality: 1,
+          exif: false,
         });
 
         setPhotosTaken(i + 1);
