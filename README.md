@@ -49,7 +49,7 @@ Follow these steps to install and run the app locally:
 ## Folder Structure
 
 ```
-📦your-expo-app
+📦VideoIMUApp
  ┣ 📂assets        # Assets like images, fonts
  ┣ 📂components    # Reusable components
  ┣ 📜App.js        # Main app entry file
